@@ -12,7 +12,7 @@ async function main() {
   await reconcileScheduledJobs();
 
   // Start HTTP server
-  app.listen(env.API_PORT, () => {
+  app.listen(env.API_PORT, '0.0.0.0', () => {
     logger.info(`🚀 API server running on http://localhost:${env.API_PORT}`);
     logger.info(`📊 Bull Board: http://localhost:${env.API_PORT}/admin/queues`);
     logger.info(`❤️  Health: http://localhost:${env.API_PORT}/health`);

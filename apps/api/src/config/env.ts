@@ -7,7 +7,7 @@ dotenv.config({ path: path.resolve(__dirname, '../../../../.env') });
 export const env = {
   // Server
   NODE_ENV: process.env.NODE_ENV || 'development',
-  API_PORT: parseInt(process.env.API_PORT || '4000', 10),
+  API_PORT: parseInt(process.env.PORT || process.env.API_PORT || '4000', 10),
 
   // Database
   DATABASE_URL:
