@@ -29,6 +29,7 @@ COPY apps/worker/package.json apps/worker/
 RUN npm ci --only=production
 
 COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
+COPY --from=builder /app/packages/shared/src ./packages/shared/src
 COPY --from=builder /app/apps/worker/dist ./apps/worker/dist
 COPY --from=builder /app/node_modules ./node_modules
 
