@@ -1,0 +1,116 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: reachinbox-prod-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-reachinbox}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-reachinbox_prod_pass}
+      POSTGRES_DB: ${POSTGRES_DB:-reachinbox}
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_prod_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U reachinbox']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: reachinbox-prod-redis
+    restart: always
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis_prod_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.13.0
+    container_name: reachinbox-prod-elasticsearch
+    restart: always
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - xpack.security.http.ssl.enabled=false
+      - 'ES_JAVA_OPTS=-Xms512m -Xmx512m'
+    ports:
+      - '9200:9200'
+    volumes:
+      - elasticsearch_prod_data:/usr/share/elasticsearch/data
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: reachinbox-prod-api
+    restart: always
+    ports:
+      - '4000:4000'
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:-reachinbox}:${POSTGRES_PASSWORD:-reachinbox_prod_pass}@postgres:5432/${POSTGRES_DB:-reachinbox}?schema=public
+      REDIS_URL: redis://redis:6379
+      ELASTICSEARCH_URL: http://elasticsearch:9200
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+      API_URL: ${API_URL:-http://localhost:4000}
+      SESSION_SECRET: ${SESSION_SECRET:-prod-secret-must-be-random-key}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      SLACK_CLIENT_ID: ${SLACK_CLIENT_ID}
+      SLACK_CLIENT_SECRET: ${SLACK_CLIENT_SECRET}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  worker:
+    build:
+      context: .
+      dockerfile: apps/worker/Dockerfile
+    container_name: reachinbox-prod-worker
+    restart: always
+    ports:
+      - '4001:4001'
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:-reachinbox}:${POSTGRES_PASSWORD:-reachinbox_prod_pass}@postgres:5432/${POSTGRES_DB:-reachinbox}?schema=public
+      REDIS_URL: redis://redis:6379
+      ELASTICSEARCH_URL: http://elasticsearch:9200
+      WORKER_CONCURRENCY: 5
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${API_URL:-http://localhost:4000}
+    container_name: reachinbox-prod-web
+    restart: always
+    ports:
+      - '3000:3000'
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_API_URL: ${API_URL:-http://localhost:4000}
+    depends_on:
+      - api
+
+volumes:
+  postgres_prod_data:
+  redis_prod_data:
+  elasticsearch_prod_data:

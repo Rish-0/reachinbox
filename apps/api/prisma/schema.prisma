@@ -1,0 +1,114 @@
+// This is the Prisma schema for ReachInbox.ai
+// It defines the PostgreSQL database models.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// User - Authenticated via Google OAuth
+// ============================================================================
+model User {
+  id             String    @id @default(uuid())
+  googleId       String    @unique
+  email          String    @unique
+  name           String
+  avatarUrl      String?
+
+  // Slack OAuth tokens (encrypted at rest in production)
+  slackAccessToken  String?
+  slackTeamId       String?
+  slackTeamName     String?
+  slackChannelId    String?
+  slackUserId       String?
+
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  campaigns      Campaign[]
+
+  @@map("users")
+}
+
+// ============================================================================
+// Campaign - A batch of scheduled emails
+// ============================================================================
+model Campaign {
+  id             String    @id @default(uuid())
+  userId         String
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  sender         String
+  subject        String
+  body           String    @db.Text
+  startTime      DateTime
+  delayBetweenMs Int       // Milliseconds between consecutive emails
+  hourlyLimit    Int
+  totalEmails    Int
+
+  createdAt      DateTime  @default(now())
+
+  emailJobs      EmailJob[]
+
+  @@index([userId])
+  @@map("campaigns")
+}
+
+// ============================================================================
+// EmailJob - Individual email send task
+// ============================================================================
+model EmailJob {
+  id            String         @id @default(uuid())
+  campaignId    String
+  campaign      Campaign       @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  userId        String
+
+  recipient     String
+  sender        String
+  subject       String
+  body          String         @db.Text
+  status        EmailJobStatus @default(SCHEDULED)
+
+  scheduledAt   DateTime
+  sentAt        DateTime?
+  smtpMessageId String?
+  attempts      Int            @default(0)
+  lastError     String?        @db.Text
+
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  @@unique([campaignId, recipient]) // Prevent duplicate recipients per campaign
+  @@index([userId, status])
+  @@index([status, scheduledAt])
+  @@index([sender])
+  @@map("email_jobs")
+}
+
+// ============================================================================
+// Session - Express session store (connect-pg-simple)
+// ============================================================================
+model Session {
+  id        String   @id @default(uuid())
+  sid       String   @unique
+  sess      Json
+  expire    DateTime
+
+  @@index([expire])
+  @@map("session")
+}
+
+// ============================================================================
+// Enums
+// ============================================================================
+enum EmailJobStatus {
+  SCHEDULED
+  PROCESSING
+  SENT
+  FAILED
+}
