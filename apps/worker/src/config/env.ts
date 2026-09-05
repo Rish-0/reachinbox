@@ -1,7 +1,11 @@
 import dotenv from 'dotenv';
 import path from 'path';
 
-dotenv.config({ path: path.resolve(__dirname, '../../../../.env') });
+try {
+  dotenv.config();
+} catch (_e) {
+  // Ignored in container/production environments
+}
 
 export const workerEnv = {
   NODE_ENV: process.env.NODE_ENV || 'development',

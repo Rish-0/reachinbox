@@ -1,8 +1,11 @@
 import dotenv from 'dotenv';
 import path from 'path';
 
-// Load .env from project root
-dotenv.config({ path: path.resolve(__dirname, '../../../../.env') });
+try {
+  dotenv.config();
+} catch (_e) {
+  // Ignored in container/production environments
+}
 
 export const env = {
   // Server
